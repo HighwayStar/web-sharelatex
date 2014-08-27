@@ -10,6 +10,7 @@ EmailHandler = require("../Email/EmailHandler")
 OneTimeTokenHandler = require "../Security/OneTimeTokenHandler"
 Analytics = require "../Analytics/AnalyticsManager"
 settings = require "settings-sharelatex"
+LdapAuth = require("../Security/LdapAuth")
 
 module.exports = UserRegistrationHandler =
 	validateEmail : (email) ->
@@ -29,7 +30,7 @@ module.exports = UserRegistrationHandler =
 		username = email.match(/^[^@]*/)
 		if @hasZeroLengths([password, email])
 			return false
-		else if !@validateEmail(email)
+		else if !@validateEmail(email) && !settings.ldap
 			return false
 		else
 			return true
@@ -91,6 +92,18 @@ module.exports = UserRegistrationHandler =
 				
 				callback null, user, setNewPasswordUrl
 
-
-
-
+	registerNewUserAuto: (req, callback = (error, user) ->) ->
+		body =
+			email:req.body.email
+			password:req.body.password
+		LdapAuth.authDN body, (err, isAllowed)->
+			if !isAllowed
+				return callback("LdapFail")
+			logger.log {body}, "user found in ldap"
+			UserRegistrationHandler.registerNewUser {
+				email: body.email
+				password: body.password
+			}, (err, user)->
+				if err? and err?.message != "EmailAlreadyRegistered"
+					return callback(err)
+				callback null, user

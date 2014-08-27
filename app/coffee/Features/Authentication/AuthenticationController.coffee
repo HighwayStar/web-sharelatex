@@ -12,6 +12,7 @@ UserHandler = require("../User/UserHandler")
 UserSessionsManager = require("../User/UserSessionsManager")
 Analytics = require "../Analytics/AnalyticsManager"
 passport = require 'passport'
+LdapAuth = require("../Security/LdapAuth")
 
 module.exports = AuthenticationController =
 
@@ -79,24 +80,35 @@ module.exports = AuthenticationController =
 			if !isAllowed
 				logger.log email:email, "too many login requests"
 				return done(null, null, {text: req.i18n.translate("to_many_login_requests_2_mins"), type: 'error'})
-			AuthenticationManager.authenticate email: email, password, (error, user) ->
-				return done(error) if error?
-				if user?
-					# async actions
-					UserHandler.setupLoginData(user, ()->)
-					LoginRateLimiter.recordSuccessfulLogin(email)
-					AuthenticationController._recordSuccessfulLogin(user._id)
-					Analytics.recordEvent(user._id, "user-logged-in", {ip:req.ip})
-					Analytics.identifyUser(user._id, req.sessionID)
-					logger.log email: email, user_id: user._id.toString(), "successful log in"
-					req.session.justLoggedIn = true
-					# capture the request ip for use when creating the session
-					user._login_req_ip = req.ip
-					return done(null, user)
-				else
-					AuthenticationController._recordFailedLogin()
-					logger.log email: email, "failed log in"
-					return done(null, false, {text: req.i18n.translate("email_or_password_wrong_try_again"), type: 'error'})
+			body =
+				email:username
+				password:password
+			LdapAuth.authDN body, (err, isAllowed)->
+				if !isAllowed
+					logger.log email:email, "ldap user fail"
+					return done(null, null, {text: req.i18n.translate("ldap failed"), type: 'error'})
+				if (Settings.ldap)
+					logger.log email:email, "using ldap"
+					email = body.email
+					password = body.password
+				AuthenticationManager.authenticate email: email, password, (error, user) ->
+					return done(error) if error?
+					if user?
+						# async actions
+						UserHandler.setupLoginData(user, ()->)
+						LoginRateLimiter.recordSuccessfulLogin(email)
+						AuthenticationController._recordSuccessfulLogin(user._id)
+						Analytics.recordEvent(user._id, "user-logged-in", {ip:req.ip})
+						Analytics.identifyUser(user._id, req.sessionID)
+						logger.log email: email, user_id: user._id.toString(), "successful log in"
+						req.session.justLoggedIn = true
+						# capture the request ip for use when creating the session
+						user._login_req_ip = req.ip
+						return done(null, user)
+					else
+						AuthenticationController._recordFailedLogin()
+						logger.log email: email, password, "failed log in"
+						return done(null, false, {text: req.i18n.translate("email_or_password_wrong_try_again"), type: 'error'})
 
 	setInSessionUser: (req, props) ->
 		for key, value of props
@@ -104,6 +116,7 @@ module.exports = AuthenticationController =
 				req.session.passport.user[key] = value
 			if req?.session?.user?
 				req.session.user[key] = value
+
 
 	isUserLoggedIn: (req) ->
 		user_id = AuthenticationController.getLoggedInUserId(req)
@@ -150,7 +163,10 @@ module.exports = AuthenticationController =
 		else
 			logger.log url:req.url, "user trying to access endpoint not in global whitelist"
 			AuthenticationController._setRedirectInSession(req)
-			return res.redirect "/login"
+			if (Settings.ldap)
+				return res.redirect "/register"
+			else
+				return res.redirect "/login"
 
 	httpAuth: basicAuth (user, pass)->
 		isValid = Settings.httpAuthUsers[user] == pass

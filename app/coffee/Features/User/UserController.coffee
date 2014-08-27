@@ -118,19 +118,23 @@ module.exports = UserController =
 			if err
 				logger.err err: err, 'error destorying session'
 			UserSessionsManager.untrackSession(user, sessionId)
-			res.redirect '/login'
+			if (settings.ldap)
+				res.redirect '/register'
+			else
+				res.redirect '/login'
 
 	register : (req, res, next = (error) ->)->
 		email = req.body.email
 		if !email? or email == ""
 			res.sendStatus 422 # Unprocessable Entity
 			return
-		UserRegistrationHandler.registerNewUserAndSendActivationEmail email, (error, user, setNewPasswordUrl) ->
+		password = req.body.password
+		if !password? or password == ""
+			res.sendStatus 422 # Unprocessable Entity
+			return
+		UserRegistrationHandler.registerNewUserAuto req, (error) ->
 			return next(error) if error?
-			res.json {
-				email: user.email
-				setNewPasswordUrl: setNewPasswordUrl
-			}
+			AuthenticationController.passportLogin req, res
 
 	clearSessions: (req, res, next = (error) ->) ->
 		metrics.inc "user.clear-sessions"

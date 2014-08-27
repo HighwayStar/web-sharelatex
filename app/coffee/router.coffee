@@ -58,8 +58,9 @@ module.exports = class Router
 		webRouter.get  '/logout', UserController.logout
 		webRouter.get  '/restricted', AuthorizationMiddlewear.restricted
 
-		# Left as a placeholder for implementing a public register page
+		webRouter.post '/register', UserController.register
 		webRouter.get  '/register', UserPagesController.registerPage
+
 		AuthenticationController.addEndpointToLoginWhitelist '/register'
 
 

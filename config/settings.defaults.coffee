@@ -164,6 +164,20 @@ module.exports = settings =
 		sessionSecret: sessionSecret
 		bcryptRounds: 12 # number of rounds used to hash user passwords (raised to power 2)
 
+	# ldap configuration
+	# Anonymous ldap use search for authentication
+	# Otherwise use bind for authentication
+	#ldap: 
+	#       host: 'ldap://ldap.host.com:389'
+	#       anonymous: true
+	#       dnObj: 'cn'
+	#       dnSuffix: 'ou=Users,dc=example,dc=com
+	#       emailAtt: 'mail'
+	#       failMessage: 'LDAP User Fail'
+	#       fieldName: 'LDAP User'
+	#       placeholder: 'LDAP User ID'
+
+
 	httpAuthUsers: httpAuthUsers
 
 	# Default features

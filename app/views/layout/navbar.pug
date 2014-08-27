@@ -59,8 +59,12 @@ nav.navbar.navbar-default
 							a(href="/register") #{translate('register')}
 
 					// login link
-					li
-						a(href="/login") #{translate('log_in')}
+					if (settings.ldap)
+						li
+							a(href="/register") #{translate('log_in')}
+					else
+						li
+							a(href="/login") #{translate('log_in')}
 
 				// projects link and account menu
 				if getSessionUser()
